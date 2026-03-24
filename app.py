@@ -11,24 +11,19 @@ st.set_page_config(
 )
 
 # ===== โหลดโมเดล =====
-import pickle # เพิ่มการ import pickle
+import streamlit as st
+import joblib
+import pandas as pd
 
 @st.cache_resource
 def load_model():
-    # วิธีที่ 1: ลองใช้ joblib แบบเดิมแต่ระบุ path ให้ชัดเจน
     try:
-        with open("retail_sales_model.pkl", "rb") as f:
-            model = joblib.load(f)
+        # โหลดตรงๆ จากชื่อไฟล์ (joblib จะจัดการเรื่อง buffer ให้เอง)
+        model = joblib.load("retail_sales_model.pkl")
         return model
     except Exception as e:
-        # วิธีที่ 2: ถ้า joblib พัง ให้ลองใช้ pickle ปกติ
-        try:
-            with open("retail_sales_model.pkl", "rb") as f:
-                model = pickle.load(f)
-            return model
-        except Exception as e2:
-            st.error(f"ไม่สามารถโหลดโมเดลได้: {e2}")
-            return None
+        st.error(f"Error loading model: {e}")
+        return None
 
 model = load_model()
 
