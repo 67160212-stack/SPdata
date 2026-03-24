@@ -13,19 +13,26 @@ st.set_page_config(
 # ===== โหลดโมเดล =====
 import streamlit as st
 import joblib
-import pandas as pd
+import sklearn
+
+# ตรวจสอบเวอร์ชันเพื่อ debug (จะแสดงบนหน้าเว็บ)
+# st.write(f"Current sklearn version: {sklearn.__version__}")
 
 @st.cache_resource
 def load_model():
     try:
-        # โหลดตรงๆ จากชื่อไฟล์ (joblib จะจัดการเรื่อง buffer ให้เอง)
-        model = joblib.load("retail_sales_model.pkl")
-        return model
+        # โหลดโมเดลตรงๆ
+        return joblib.load("retail_sales_model.pkl")
     except Exception as e:
         st.error(f"Error loading model: {e}")
+        st.info("คำแนะนำ: ตรวจสอบว่า scikit-learn ในไฟล์ requirements.txt เป็นเวอร์ชัน 1.6.1")
         return None
 
 model = load_model()
+
+if model:
+    st.success("✅ โหลดโมเดลสำเร็จ! พร้อมใช้งาน")
+    # ... ส่วนของ Form รับค่า และ model.predict ตามที่ให้ไว้ก่อนหน้านี้ ...
 
 # ===== ส่วนหัวของเว็บไซต์ =====
 st.title("📊 ระบบพยากรณ์ยอดขายสินค้า")
