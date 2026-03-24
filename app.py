@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import sklearn
 
 # ===== 1. ตั้งค่าหน้าเว็บ =====
 st.set_page_config(
@@ -11,57 +10,55 @@ st.set_page_config(
     layout="centered"
 )
 
-# ===== 2. ฟังก์ชันโหลดโมเดล (ใช้ Cache เพื่อความเร็ว) =====
+# ===== 2. โหลดโมเดล =====
 @st.cache_resource
 def load_model():
     try:
-        # โหลดโมเดลจากไฟล์ที่คุณเตรียมไว้
-        return joblib.load("retail_sales_model.pkl")
+        model = joblib.load("retail_sales_model.pkl")
+        return model
     except Exception as e:
-        return f"error: {str(e)}"
+        return None, str(e)
 
 model_result = load_model()
 
-# ส่วนหัวของเว็บ
+# ===== Header =====
 st.title("📊 Retail Sales Prediction")
 st.markdown("ระบบวิเคราะห์และพยากรณ์ยอดขายด้วย AI")
 st.divider()
 
-# ตรวจสอบว่าโหลดโมเดลสำเร็จไหม
-if isinstance(model_result, str):
-    st.error(f"❌ ไม่สามารถโหลดโมเดลได้: {model_result}")
-    st.info("💡 วิธีแก้: ตรวจสอบว่ามีไฟล์ 'retail_sales_model.pkl' อยู่ในโฟลเดอร์เดียวกับโค้ดนี้")
+# ===== ตรวจสอบโมเดล =====
+if isinstance(model_result, tuple):
+    st.error(f"❌ โหลดโมเดลไม่ได้: {model_result[1]}")
 else:
     model = model_result
-    
-    # ===== 3. ส่วนรับข้อมูลจากผู้ใช้ (Input Form) =====
+
+    # ===== 3. Input =====
     with st.form("my_form"):
         st.subheader("📝 กรอกข้อมูลเพื่อพยากรณ์")
-        
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            inventory = st.number_input("Inventory Level (ระดับสินค้าคงคลัง)", value=500)
-            units_ordered = st.number_input("Units Ordered (จำนวนที่สั่งซื้อ)", value=50)
-            demand_forecast = st.number_input("Demand Forecast (คาดการณ์ความต้องการ)", value=100)
-            price = st.number_input("Price (ราคาสินค้า)", value=250.0)
-            discount = st.slider("Discount % (ส่วนลด)", 0, 100, 10)
-            comp_pricing = st.number_input("Competitor Pricing (ราคาคู่แข่ง)", value=245.0)
-            holiday_promo = st.selectbox("Holiday Promotion", [0, 1], format_func=lambda x: "มีโปรโมชั่น" if x == 1 else "ไม่มี")
+            inventory = st.number_input("Inventory Level", value=500)
+            units_ordered = st.number_input("Units Ordered", value=50)
+            demand_forecast = st.number_input("Demand Forecast", value=100)
+            price = st.number_input("Price", value=250.0)
+            discount = st.slider("Discount (%)", 0, 100, 10)
+            comp_pricing = st.number_input("Competitor Pricing", value=245.0)
+            holiday_promo = st.selectbox("Holiday Promotion", [0, 1])
 
         with col2:
             store_id = st.text_input("Store ID", "S001")
             product_id = st.text_input("Product ID", "P001")
             category = st.selectbox("Category", ["Electronics", "Clothing", "Home & Kitchen", "Health & Beauty", "Toys"])
             region = st.selectbox("Region", ["North", "South", "East", "West", "Central"])
-            weather = st.selectbox("Weather Condition", ["Sunny", "Rainy", "Cloudy", "Stormy"])
-            season = st.selectbox("Seasonality", ["Spring", "Summer", "Autumn", "Winter"])
+            weather = st.selectbox("Weather", ["Sunny", "Rainy", "Cloudy", "Stormy"])
+            season = st.selectbox("Season", ["Spring", "Summer", "Autumn", "Winter"])
 
         submit = st.form_submit_button("🔮 ทำนายยอดขาย")
 
-    # ===== 4. ส่วนแสดงผลการทำนาย =====
+    # ===== 4. Predict =====
     if submit:
-        # จัดเตรียมข้อมูลให้ตรงกับ Column ของ Model (สำคัญมาก!)
         input_df = pd.DataFrame([{
             "Inventory_Level": inventory,
             "Units_Ordered": units_ordered,
@@ -79,21 +76,25 @@ else:
         }])
 
         try:
-            # ทำนายผล
-            prediction = model.predict(input_df)[0]
-            
+            # ===== สำคัญ: ต้องมี preprocessing ใน model =====
+            prediction = model.predict(input_df)
+
+            # กันค่าติดลบ
+            prediction_value = float(max(0, prediction[0]))
+
             st.markdown("---")
-            st.success("### วิเคราะห์เสร็จสิ้น")
-            
-            # ตกแต่งการแสดงผลตัวเลข
-            st.metric(label="ยอดขายที่คาดการณ์ได้", value=f"{max(0, prediction):,.2f} หน่วย/บาท")
-            
-            # แสดงรายละเอียดข้อมูลที่ใช้ทำนาย
-            with st.expander("🔍 ดูข้อมูลที่ส่งให้ AI"):
+            st.success("✅ วิเคราะห์เสร็จสิ้น")
+
+            st.metric(
+                label="ยอดขายที่คาดการณ์",
+                value=f"{prediction_value:,.2f}"
+            )
+
+            with st.expander("🔍 ดูข้อมูลที่ใช้ทำนาย"):
                 st.dataframe(input_df)
 
         except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดระหว่างทำนาย: {e}")
+            st.error(f"❌ Prediction Error: {e}")
 
-# Footer
-st.caption("Developed by Gemini | Scikit-learn 1.5.0 Ready")
+# ===== Footer =====
+st.caption("Developed with ❤️ using Streamlit & Scikit-learn")
