@@ -96,4 +96,4 @@ else:
             st.error(f"เกิดข้อผิดพลาดระหว่างทำนาย: {e}")
 
 # Footer
-st.caption("Developed by Gemini | Scikit-learn 1.6.1 Ready")
+st.caption("Developed by Gemini | Scikit-learn 1.5.0 Ready")
