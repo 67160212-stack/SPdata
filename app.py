@@ -1,67 +1,99 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import joblib
 import sklearn
 
-# ===== การตั้งค่าหน้าเว็บ =====
-st.set_page_config(page_title="Retail Prediction", page_icon="📊")
+# ===== 1. ตั้งค่าหน้าเว็บ =====
+st.set_page_config(
+    page_title="ระบบพยากรณ์ยอดขายสินค้า",
+    page_icon="📊",
+    layout="centered"
+)
 
-# แสดงเวอร์ชันปัจจุบันเพื่อการตรวจสอบ (Debug)
-st.sidebar.write(f"⚙️ System Check:")
-st.sidebar.write(f"- Sklearn version: {sklearn.__version__}")
-
+# ===== 2. ฟังก์ชันโหลดโมเดล (ใช้ Cache เพื่อความเร็ว) =====
 @st.cache_resource
-def load_retail_model():
+def load_model():
     try:
-        # พยายามโหลดโมเดล
+        # โหลดโมเดลจากไฟล์ที่คุณเตรียมไว้
         return joblib.load("retail_sales_model.pkl")
     except Exception as e:
-        return e
+        return f"error: {str(e)}"
 
-# ส่วนแสดงผลหน้าเว็บ
-st.title("📊 ระบบทำนายยอดขายรายสินค้า")
+model_result = load_model()
+
+# ส่วนหัวของเว็บ
+st.title("📊 Retail Sales Prediction")
+st.markdown("ระบบวิเคราะห์และพยากรณ์ยอดขายด้วย AI")
 st.divider()
 
-model = load_retail_model()
-
-# ตรวจสอบ Error
-if isinstance(model, Exception):
-    st.error(f"❌ Error: {model}")
-    if "AttributeError" in str(model):
-        st.warning("⚠️ สาเหตุ: เวอร์ชัน scikit-learn ไม่ตรงกับที่ใช้สร้างโมเดล")
-        st.info("💡 วิธีแก้: ตรวจสอบว่าในเครื่องติดตั้ง scikit-learn==1.6.1 หรือยัง")
-    st.stop() # หยุดการทำงานหากโหลดโมเดลไม่ได้
-
-# --- ถ้าโหลดผ่านแล้ว จะแสดงฟอร์มด้านล่าง ---
-st.success("✅ โหลดโมเดลเวอร์ชัน 1.6.1 สำเร็จ!")
-
-with st.form("input_form"):
-    col1, col2 = st.columns(2)
-    with col1:
-        inventory = st.number_input("Inventory Level", value=500)
-        units_ordered = st.number_input("Units Ordered", value=50)
-        demand = st.number_input("Demand Forecast", value=100)
-        price = st.number_input("Price", value=250.0)
-        disc = st.slider("Discount (%)", 0, 100, 10)
-        comp = st.number_input("Competitor Pricing", value=245.0)
-        promo = st.selectbox("Holiday Promotion", [0, 1])
-
-    with col2:
-        sid = st.text_input("Store ID", "S001")
-        pid = st.text_input("Product ID", "P001")
-        cat = st.selectbox("Category", ["Electronics", "Clothing", "Home & Kitchen", "Health & Beauty", "Toys"])
-        reg = st.selectbox("Region", ["North", "South", "East", "West", "Central"])
-        wea = st.selectbox("Weather", ["Sunny", "Rainy", "Cloudy", "Stormy"])
-        sea = st.selectbox("Season", ["Spring", "Summer", "Autumn", "Winter"])
-
-    if st.form_submit_button("🔮 ทำนายยอดขาย"):
-        data = pd.DataFrame([{
-            "Inventory_Level": inventory, "Units_Ordered": units_ordered,
-            "Demand_Forecast": demand, "Price": price, "Discount": disc,
-            "Competitor_Pricing": comp, "Holiday_Promotion": promo,
-            "Store_ID": sid, "Product_ID": pid, "Category": cat,
-            "Region": reg, "Weather_Condition": wea, "Seasonality": sea
-        }])
+# ตรวจสอบว่าโหลดโมเดลสำเร็จไหม
+if isinstance(model_result, str):
+    st.error(f"❌ ไม่สามารถโหลดโมเดลได้: {model_result}")
+    st.info("💡 วิธีแก้: ตรวจสอบว่ามีไฟล์ 'retail_sales_model.pkl' อยู่ในโฟลเดอร์เดียวกับโค้ดนี้")
+else:
+    model = model_result
+    
+    # ===== 3. ส่วนรับข้อมูลจากผู้ใช้ (Input Form) =====
+    with st.form("my_form"):
+        st.subheader("📝 กรอกข้อมูลเพื่อพยากรณ์")
         
-        prediction = model.predict(data)[0]
-        st.success(f"### ผลการพยากรณ์: {max(0, prediction):,.2f}")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            inventory = st.number_input("Inventory Level (ระดับสินค้าคงคลัง)", value=500)
+            units_ordered = st.number_input("Units Ordered (จำนวนที่สั่งซื้อ)", value=50)
+            demand_forecast = st.number_input("Demand Forecast (คาดการณ์ความต้องการ)", value=100)
+            price = st.number_input("Price (ราคาสินค้า)", value=250.0)
+            discount = st.slider("Discount % (ส่วนลด)", 0, 100, 10)
+            comp_pricing = st.number_input("Competitor Pricing (ราคาคู่แข่ง)", value=245.0)
+            holiday_promo = st.selectbox("Holiday Promotion", [0, 1], format_func=lambda x: "มีโปรโมชั่น" if x == 1 else "ไม่มี")
+
+        with col2:
+            store_id = st.text_input("Store ID", "S001")
+            product_id = st.text_input("Product ID", "P001")
+            category = st.selectbox("Category", ["Electronics", "Clothing", "Home & Kitchen", "Health & Beauty", "Toys"])
+            region = st.selectbox("Region", ["North", "South", "East", "West", "Central"])
+            weather = st.selectbox("Weather Condition", ["Sunny", "Rainy", "Cloudy", "Stormy"])
+            season = st.selectbox("Seasonality", ["Spring", "Summer", "Autumn", "Winter"])
+
+        submit = st.form_submit_button("🔮 ทำนายยอดขาย")
+
+    # ===== 4. ส่วนแสดงผลการทำนาย =====
+    if submit:
+        # จัดเตรียมข้อมูลให้ตรงกับ Column ของ Model (สำคัญมาก!)
+        input_df = pd.DataFrame([{
+            "Inventory_Level": inventory,
+            "Units_Ordered": units_ordered,
+            "Demand_Forecast": demand_forecast,
+            "Price": price,
+            "Discount": discount,
+            "Competitor_Pricing": comp_pricing,
+            "Holiday_Promotion": holiday_promo,
+            "Store_ID": store_id,
+            "Product_ID": product_id,
+            "Category": category,
+            "Region": region,
+            "Weather_Condition": weather,
+            "Seasonality": season
+        }])
+
+        try:
+            # ทำนายผล
+            prediction = model.predict(input_df)[0]
+            
+            st.markdown("---")
+            st.success("### วิเคราะห์เสร็จสิ้น")
+            
+            # ตกแต่งการแสดงผลตัวเลข
+            st.metric(label="ยอดขายที่คาดการณ์ได้", value=f"{max(0, prediction):,.2f} หน่วย/บาท")
+            
+            # แสดงรายละเอียดข้อมูลที่ใช้ทำนาย
+            with st.expander("🔍 ดูข้อมูลที่ส่งให้ AI"):
+                st.dataframe(input_df)
+
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดระหว่างทำนาย: {e}")
+
+# Footer
+st.caption("Developed by Gemini | Scikit-learn 1.6.1 Ready")
