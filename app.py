@@ -2,67 +2,71 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import sklearn
 
-# ===== 1. ตั้งค่าหน้าเว็บ =====
+# ===== 1. การตั้งค่าหน้าเว็บ =====
 st.set_page_config(
-    page_title="ระบบพยากรณ์ยอดขายสินค้า",
-    page_icon="📊",
+    page_title="Retail Sales Forecasting",
+    page_icon="🛍️",
     layout="centered"
 )
 
-# ===== 2. ฟังก์ชันโหลดโมเดล (ใช้ Cache เพื่อความเร็ว) =====
+# ===== 2. ฟังก์ชันโหลดโมเดล =====
 @st.cache_resource
-def load_model():
+def load_retail_model():
     try:
-        # โหลดโมเดลจากไฟล์ที่คุณเตรียมไว้
-        return joblib.load("retail_sales_model.pkl")
+        # โหลดไฟล์ pkl ที่คุณมี
+        model = joblib.load("retail_sales_model.pkl")
+        return model
     except Exception as e:
-        return f"error: {str(e)}"
+        return e
 
-model_result = load_model()
+model = load_retail_model()
 
-# ส่วนหัวของเว็บ
-st.title("📊 Retail Sales Prediction")
-st.markdown("ระบบวิเคราะห์และพยากรณ์ยอดขายด้วย AI")
+# ===== 3. ส่วนการแสดงผลหน้าเว็บ =====
+st.title("📊 ระบบทำนายยอดขายรายสินค้า")
+st.write("กรอกข้อมูลด้านล่างเพื่อประมวลผลการทำนายยอดขาย")
 st.divider()
 
-# ตรวจสอบว่าโหลดโมเดลสำเร็จไหม
-if isinstance(model_result, str):
-    st.error(f"❌ ไม่สามารถโหลดโมเดลได้: {model_result}")
-    st.info("💡 วิธีแก้: ตรวจสอบว่ามีไฟล์ 'retail_sales_model.pkl' อยู่ในโฟลเดอร์เดียวกับโค้ดนี้")
+if isinstance(model, Exception):
+    st.error(f"ไม่สามารถโหลดโมเดลได้: {model}")
+    st.info("กรุณาตรวจสอบว่ามีไฟล์ 'retail_sales_model.pkl' อยู่ในโฟลเดอร์เดียวกันหรือไม่")
 else:
-    model = model_result
-    
-    # ===== 3. ส่วนรับข้อมูลจากผู้ใช้ (Input Form) =====
-    with st.form("my_form"):
-        st.subheader("📝 กรอกข้อมูลเพื่อพยากรณ์")
-        
+    # สร้างฟอร์มรับข้อมูล
+    with st.form("sales_form"):
         col1, col2 = st.columns(2)
         
         with col1:
-            inventory = st.number_input("Inventory Level (ระดับสินค้าคงคลัง)", value=500)
-            units_ordered = st.number_input("Units Ordered (จำนวนที่สั่งซื้อ)", value=50)
-            demand_forecast = st.number_input("Demand Forecast (คาดการณ์ความต้องการ)", value=100)
-            price = st.number_input("Price (ราคาสินค้า)", value=250.0)
-            discount = st.slider("Discount % (ส่วนลด)", 0, 100, 10)
-            comp_pricing = st.number_input("Competitor Pricing (ราคาคู่แข่ง)", value=245.0)
-            holiday_promo = st.selectbox("Holiday Promotion", [0, 1], format_func=lambda x: "มีโปรโมชั่น" if x == 1 else "ไม่มี")
-
-        with col2:
+            st.subheader("📦 ข้อมูลสต็อกและคำสั่งซื้อ")
+            inventory = st.number_input("Inventory Level", value=500)
+            units_ordered = st.number_input("Units Ordered", value=50)
+            demand_forecast = st.number_input("Demand Forecast", value=100)
+            category = st.selectbox("Category", ["Electronics", "Clothing", "Home & Kitchen", "Health & Beauty", "Toys"])
             store_id = st.text_input("Store ID", "S001")
             product_id = st.text_input("Product ID", "P001")
-            category = st.selectbox("Category", ["Electronics", "Clothing", "Home & Kitchen", "Health & Beauty", "Toys"])
+
+        with col2:
+            st.subheader("💰 ข้อมูลราคาและโปรโมชั่น")
+            price = st.number_input("Price", value=250.0)
+            discount = st.slider("Discount (%)", 0, 100, 10)
+            comp_pricing = st.number_input("Competitor Pricing", value=245.0)
+            holiday_promo = st.selectbox("Holiday Promotion", [0, 1], format_func=lambda x: "มีโปร" if x == 1 else "ไม่มีโปร")
+
+        st.subheader("🌍 ข้อมูลพื้นที่และสภาพอากาศ")
+        c3, c4, c5 = st.columns(3)
+        with c3:
             region = st.selectbox("Region", ["North", "South", "East", "West", "Central"])
-            weather = st.selectbox("Weather Condition", ["Sunny", "Rainy", "Cloudy", "Stormy"])
-            season = st.selectbox("Seasonality", ["Spring", "Summer", "Autumn", "Winter"])
+        with c4:
+            weather = st.selectbox("Weather", ["Sunny", "Rainy", "Cloudy", "Stormy"])
+        with c5:
+            season = st.selectbox("Season", ["Spring", "Summer", "Autumn", "Winter"])
 
-        submit = st.form_submit_button("🔮 ทำนายยอดขาย")
+        submit = st.form_submit_button("🔮 ทำนายยอดขายทันที")
 
-    # ===== 4. ส่วนแสดงผลการทำนาย =====
+    # ===== 4. ส่วนการทำนายผล =====
     if submit:
-        # จัดเตรียมข้อมูลให้ตรงกับ Column ของ Model (สำคัญมาก!)
-        input_df = pd.DataFrame([{
+        # เตรียมข้อมูลให้อยู่ในรูปแบบ DataFrame
+        # ชื่อ Column ต้องสะกดตรงกับที่ใช้เทรนโมเดลเป๊ะๆ
+        input_dict = {
             "Inventory_Level": inventory,
             "Units_Ordered": units_ordered,
             "Demand_Forecast": demand_forecast,
@@ -76,24 +80,25 @@ else:
             "Region": region,
             "Weather_Condition": weather,
             "Seasonality": season
-        }])
+        }
+        
+        df_input = pd.DataFrame([input_dict])
 
         try:
-            # ทำนายผล
-            prediction = model.predict(input_df)[0]
+            # คำนวณยอดขาย
+            result = model.predict(df_input)[0]
             
+            # แสดงผล
             st.markdown("---")
-            st.success("### วิเคราะห์เสร็จสิ้น")
+            st.balloons()
+            st.success("### วิเคราะห์ผลสำเร็จ")
+            st.metric(label="ยอดขายที่คาดการณ์ (Units/Value)", value=f"{max(0, result):,.2f}")
             
-            # ตกแต่งการแสดงผลตัวเลข
-            st.metric(label="ยอดขายที่คาดการณ์ได้", value=f"{max(0, prediction):,.2f} หน่วย/บาท")
-            
-            # แสดงรายละเอียดข้อมูลที่ใช้ทำนาย
-            with st.expander("🔍 ดูข้อมูลที่ส่งให้ AI"):
-                st.dataframe(input_df)
-
+            with st.expander("ดูข้อมูลชุดที่ใช้ทำนาย"):
+                st.write(df_input)
+                
         except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดระหว่างทำนาย: {e}")
+            st.error(f"เกิดข้อผิดพลาดในการคำนวณ: {e}")
+            st.info("สาเหตุอาจเกิดจากเวอร์ชันของ scikit-learn ในเครื่องไม่ตรงกับที่ใช้สร้างโมเดล")
 
-# Footer
-st.caption("Developed by Gemini | Scikit-learn 1.6.1 Ready")
+st.caption("Retail Sales Prediction Tool v1.0")
